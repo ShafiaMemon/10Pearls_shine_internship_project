@@ -1,0 +1,87 @@
+name: AQI CI/CD Pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Feature pipeline hourly
+    - cron: '0 * * * *'
+    # Training pipeline daily at 1 AM UTC
+    - cron: '0 1 * * *'
+
+jobs:
+  feature_pipeline:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    env:
+      DATA_DIR: ./data
+      HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10.x'  # ✅ Use 3.10, not 3.1
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: |
+          pip install --no-cache-dir "hopsworks[python]==4.2.0"
+          pip install --no-cache-dir pandas pyarrow numpy matplotlib seaborn scikit-learn joblib requests python-dateutil
+
+      - name: Create data directory
+        run: mkdir -p $DATA_DIR
+
+      - name: Run Feature Pipeline
+        run: python test_aqi_ds10pearls.py --pipeline feature
+
+      - name: Upload Feature Files
+        uses: actions/upload-artifact@v4
+        with:
+          name: features
+          path: |
+            ${{ env.DATA_DIR }}/karachi_air_features_2024.csv
+            ${{ env.DATA_DIR }}/karachi_air_features_2024.parquet
+
+  training_pipeline:
+    runs-on: ubuntu-latest
+    needs: feature_pipeline
+    env:
+      DATA_DIR: ./data
+      HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10.x'  # ✅ Corrected
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install dependencies
+        run: |
+          pip install --no-cache-dir "hopsworks[python]==4.2.0"
+          pip install --no-cache-dir pandas pyarrow numpy matplotlib seaborn scikit-learn joblib requests python-dateutil
+
+      - name: Download feature files
+        uses: actions/download-artifact@v4
+        with:
+          name: features
+          path: ${{ env.DATA_DIR }}
+
+      - name: Run Training Pipeline
+        run: python test_aqi_ds10pearls.py --pipeline train
+
+      - name: Upload Trained Models
+        uses: actions/upload-artifact@v4
+        with:
+          name: models
+          path: |
+            ${{ env.DATA_DIR }}/pm25_rf_model.pkl
+            ${{ env.DATA_DIR }}/pm25_ridge_model.pkl
