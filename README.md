@@ -11,3 +11,4 @@
 - **GitHub Actions**: Automates CI/CD workflows to run feature extraction and training pipelines on a schedule.
 - **Pandas & NumPy**: Perform data cleaning, feature engineering, and numerical computations.
 - **Matplotlib**: Used for data visualization and trend analysis during model evaluation.
+- **Streamlit**: Developed an interactive frontend to visualize air quality insights and model predictions in real time.
